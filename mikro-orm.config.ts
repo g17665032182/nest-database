@@ -1,4 +1,5 @@
 // 在 MikroORM 配置加载时读取 .env，避免在每个 npm script 中重复配置环境预加载参数。
+import 'dotenv/config';
 
 import { Migrator } from '@mikro-orm/migrations';
 import { defineConfig, PostgreSqlDriver } from '@mikro-orm/postgresql';
