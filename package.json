@@ -12,6 +12,7 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
+    "test": "ts-node --files test/todo-audit.spec.ts",
     "orm:debug": "mikro-orm debug",
     "orm:create": "mikro-orm migration:create",
     "orm:up": "mikro-orm migration:up",

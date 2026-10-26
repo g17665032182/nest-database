@@ -3,10 +3,11 @@ import { TodosService } from './todos.service';
 import { TodosController } from './todos.controller';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Todo } from './entities/todo.entity';
+import { TodoLogsModule } from '../todo-logs/todo-logs.module';
 
 @Module({
   // 导入Repository
-  imports:[MikroOrmModule.forFeature([Todo])],
+  imports: [MikroOrmModule.forFeature([Todo]), TodoLogsModule],
   controllers: [TodosController],
   providers: [TodosService],
 })
