@@ -24,8 +24,9 @@
 - `docs/backend-development-workflow.md`
 - `docs/nest-mikroorm-postgres.md`
 - `docs/agent-compatibility.md`
+- `docs/templates/crud-contract.md`
 
-如果目标项目采用其他技术栈，保留通用流程并按实际依赖版本查询官方文档；不要只复制默认技术栈命令。分发时使用固定版本或提交号，避免不同项目无意间使用不同的流程版本。
+CRUD 任务开始时，Agent 还需根据模板创建并保留 `docs/contracts/<资源名>-crud-contract.md`。如果目标项目采用其他技术栈，保留通用流程并按实际依赖版本查询官方文档；不要只复制默认技术栈命令。分发时使用固定版本或提交号，避免不同项目无意间使用不同的流程版本。
 
 ## 官方说明
 

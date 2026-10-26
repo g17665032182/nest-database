@@ -24,7 +24,7 @@ Swagger 文档地址为 `http://localhost:3000/api`。如需更换端口，在 `
 
 流程支持两种主要场景：空项目初始化时使用选定的包管理器创建 NestJS 项目并安装数据库依赖；已使用默认技术栈时先确认业务字段和约束，再实现 CRUD。技术栈不同时，Agent 必须先按实际依赖版本查阅对应官方文档并保留现有技术选型。
 
-跨项目复用时，需要一并提供 `AGENTS.md`、`CLAUDE.md` 和 `docs/` 下的流程文件。只复制入口文件不足以提供完整流程。
+每个 CRUD 任务都应从 [契约模板](docs/templates/crud-contract.md) 创建并保留 `docs/contracts/<资源名>-crud-contract.md`，作为用户确认、实现和验收的共同记录。跨项目复用时，需要一并提供 `AGENTS.md`、`CLAUDE.md` 和 `docs/` 下的流程文件及模板。只复制入口文件不足以提供完整流程。
 
 ## 常用命令
 
