@@ -1,0 +1,6 @@
+allowBuilds:
+  '@scarf/scarf': true
+  '@swc/core': true
+  bcrypt: true
+  esbuild: false
+  unrs-resolver: false
