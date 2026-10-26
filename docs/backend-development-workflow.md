@@ -1,126 +1,76 @@
-# 后端开发流程
+# 通用后端初始化与 CRUD 流程
 
-本文按当前仓库的 NestJS + Fastify + MikroORM + PostgreSQL 实现编写。CLI 命令使用项目本地安装的版本，不需要全局安装。
+本文是跨 Agent、跨项目的流程核心。Agent 通过项目根目录的 `AGENTS.md` 进入本流程；技术栈实现细节见 [NestJS + MikroORM + PostgreSQL 约定](nest-mikroorm-postgres.md)。
 
-## 1. 准备环境并启动
+## 1. 识别项目状态
 
-```bash
-pnpm install
-cp .env.example .env
-```
+先查看项目指令、Git 状态、目录内容、包管理器锁文件、`package.json`、依赖版本和一个现有业务模块。保留已有文件和未提交修改，不要把“目录里文件少”直接当成可以覆盖。
 
-在 `.env` 中填写 PostgreSQL 连接信息和 `JWT_SECRET`，并先创建 `MIKRO_ORM_DB_NAME` 对应的数据库。`.env` 已被 Git 忽略，不要提交真实密码或密钥。
+| 项目状态                            | 流程                                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------------------- |
+| 没有应用代码和包清单的空项目        | 进入初始化模式，按用户指定的包管理器创建 NestJS 应用并安装所需依赖                     |
+| 已有 NestJS + MikroORM + PostgreSQL | 进入 CRUD 模式，沿用当前版本、模块结构和已安装库，不重复安装依赖                       |
+| 只具备部分默认技术栈                | 列出缺少的组件，查证兼容版本和官方配置后，只补齐需要的依赖                             |
+| 使用不同框架、ORM 或数据库          | 保留项目现有选型；先检查实际版本并查阅对应官方文档，再按现有栈实现，不擅自迁移到默认栈 |
 
-```bash
-pnpm run orm:up
-pnpm run start:dev
-```
+包管理器优先根据锁文件和 `package.json` 的 `packageManager` 字段判断。空项目没有任何线索时，先采用用户指定的工具；仍未指定时使用 pnpm，并在执行安装前明确告知。不要为一个项目混用多个包管理器或生成多份锁文件。
 
-应用使用 Fastify，Swagger 页面由 `src/main.ts` 挂载在 `/api`。默认端口是 `3000`，也可以通过 `PORT` 修改。
+如果技术栈与预期不一致，先核对相应版本的官方文档、CLI 选项和迁移方式。不能确认 API 或命令时先查证，不要凭记忆补全。
 
-## 2. 新增业务模块
+## 2. 初始化空项目
 
-先确定资源名、接口路由、请求/响应字段和访问权限，再用 Nest CLI 生成模块骨架。以下以 `articles` 为例：
+确认目标目录和项目名称后，用选定的包管理器调用 Nest CLI，并让 CLI 安装 NestJS 项目依赖。使用 pnpm 时，具体流程见技术栈文档。若目标目录已有内容，先用 dry-run 检查生成路径，不要覆盖用户文件。
 
-```bash
-pnpm exec nest g module articles
-pnpm exec nest g service articles --no-spec
-pnpm exec nest g controller articles --no-spec
-```
+基础应用初始化完成后，再配置数据库连接、ORM、迁移、输入校验和环境变量。只安装当前模板必需或业务明确需要的依赖；JWT、日志、Swagger、限流等可选能力按需求添加。初始化结束时运行构建和项目自带测试，确认应用骨架可用。
 
-Nest CLI 的 `g` 是 `generate` 的别名，`--no-spec` 用于不生成当前仓库尚无测试运行环境支持的 spec 文件。生成后检查模块是否已自动注册；若没有，在对应模块的 `imports`、`controllers`、`providers` 中补齐。
+如同一个请求还要求实现业务资源，初始化验证通过后继续执行下面的 CRUD 流程。
 
-按当前 `todos` 模块的组织方式补充资源文件：
+## 3. 先确认业务契约
 
-```text
-src/articles/
-  dto/
-    create-article.dto.ts
-    update-article.dto.ts
-  entities/
-    article.entity.ts
-  articles.controller.ts
-  articles.module.ts
-  articles.service.ts
-```
+编码前先阅读相似模块和现有约定，把业务需求整理成字段与接口契约。向用户确认字段和会影响数据安全、兼容性或 API 行为的约束；未经说明的规则不要擅自当成业务事实。
 
-职责保持清晰：
+| 字段        | 数据类型 | 创建时必填 | 可否为空 | 默认值 | 唯一/索引 | 校验规则       | 关联关系 | 是否可写/可返回         |
+| ----------- | -------- | ---------- | -------- | ------ | --------- | -------------- | -------- | ----------------------- |
+| 示例：title | 字符串   | 是         | 否       | 无     | 无        | 长度上限待确认 | 无       | 创建/更新可写，列表返回 |
 
-- DTO 描述输入并使用 `class-validator` 装饰器校验。全局 `ValidationPipe` 已开启 `transform`、`whitelist` 和 `forbidNonWhitelisted`。
-- Entity 描述数据库映射。更新 DTO 可参考 `UpdateTodoDto`，使用 `PartialType`。
-- Module 通过 `MikroOrmModule.forFeature([Article])` 注册实体仓储，并声明 Controller 和 Service。
-- Service 处理业务逻辑和持久化，参考 `TodosService` 中的 Repository、`EntityManager` 和 `flush()` 用法。
-- Controller 负责 HTTP 路由、参数绑定和调用 Service，不把业务规则堆在控制器里。
+同时确认：
 
-确认新模块已由 `AppModule` 导入。需要公开访问的接口用现有 `@Public()` 标记；认证 Guard 默认保护其余接口。新增接口也要检查全局限流策略，并补充 Swagger 的请求/响应说明。
+- 路由和 CRUD 范围，以及列表分页、排序、过滤方式。
+- 删除采用软删除还是物理删除；关联数据删除或保留的行为。
+- 认证、角色权限和数据所有权规则；哪些路由是公开的。
+- 唯一约束冲突、资源不存在、非法输入等情况的 API 错误行为。
+- 数据库迁移与旧数据兼容要求。
 
-## 3. 修改数据库结构
+字段类型、是否可空、唯一约束、外键级联和删除方式有歧义时，必须先提问；用户确认前不生成相关数据库迁移。用户已明确给出的规则可以整理复述后继续，不必重复追问。
 
-先修改 Entity，再让 MikroORM CLI 根据实体差异生成迁移：
+## 4. 实现 CRUD
 
-```bash
-pnpm exec mikro-orm migration:create --name=add_article_table
-```
+遵循项目现有分层，不把数据库逻辑和业务规则塞进 Controller：
 
-检查 `src/migrations/` 中生成的迁移文件及其回滚 SQL，确认没有意外删表或丢失数据，然后应用迁移：
+1. 用项目已有 CLI 生成模块、Service 和 Controller 骨架。
+2. Entity 只表达持久化结构和数据库约束。
+3. Create/Update/Query DTO 分别表达输入契约，复用现有验证管道和校验库。
+4. Service 实现业务规则、权限范围内的数据访问和持久化。
+5. Controller 只负责 HTTP 路由、参数绑定、状态码和 Service 调用。
+6. Module 注册 Entity repository，并将 Controller 和 Service 接入依赖图。
+7. 新增/修改 Entity 后生成并审查迁移，再按环境执行迁移。
 
-```bash
-pnpm exec mikro-orm migration:pending
-pnpm run orm:up
-```
+Guard、Decorator 和自定义 Pipe 都是条件能力，不是每个 CRUD 模块都要生成：
 
-迁移文件要和对应业务代码一起提交。共享环境和生产环境只执行经过审查的迁移；不要用自动 schema 同步代替版本化迁移。
+- 先检查项目是否已有全局认证 Guard、角色 Guard、验证 Pipe 或当前用户 Decorator，能复用就不重复实现。
+- 只有资源权限、角色限制或所有权校验需要独立授权逻辑时才新增 Guard。
+- 只有需要重复提取请求上下文或复用元数据时才新增 Decorator。
+- 只有全局 Pipe 和 DTO 验证器无法表达可复用转换/校验规则时才新增 Pipe。
+- 公开接口使用项目现有公开标记；默认不要绕开认证或输入校验。
 
-## 4. 准备种子数据
+代码注释按项目约定使用中文，优先复用已安装依赖，不为已有能力另造实现。
 
-项目已有 `src/seeders/DatabaseSeeder.ts` 以及 Todo、User 工厂，可按现有模式扩展。需要新 Seeder 时使用 MikroORM CLI：
+## 5. 验证和完成条件
 
-```bash
-pnpm exec mikro-orm seeder:create ArticleSeeder
-```
+- 对照已确认的字段矩阵检查 DTO、Entity、数据库迁移和 API 输出。
+- 验证创建、列表、详情、更新、删除及权限、异常和输入校验路径。
+- 执行项目已有的测试、构建、格式检查和迁移状态检查；初始化项目还要确认锁文件与实际依赖一致。
+- 检查 `git diff`，确保没有密钥、无关改动、未审查的破坏性 SQL 或误生成文件。
+- 汇报改动文件、执行过的命令和真实结果。没运行的测试不得说成通过；项目缺测试设施时说明缺口和风险。
 
-`pnpm run seeder:run` 执行默认 `DatabaseSeeder`。新增 Seeder 后要确认默认 Seeder 如何调用它；仅创建 Seeder 文件不会自动将其加入默认执行流程。
-
-`pnpm run orm:fresh` 会清空数据库并重放迁移、执行默认 Seeder。运行前确认 `.env` 指向可被清空的本地开发数据库，绝不要对共享库或生产库运行。
-
-## 5. 验证改动
-
-```bash
-pnpm run build
-pnpm run start:dev
-```
-
-通过 Swagger 页面和实际请求检查成功、校验失败、未登录、资源不存在等路径。涉及数据库结构的改动，还要在本地空库验证迁移能完整执行。
-
-当前仓库没有 `test`、`test:e2e` 等 package scripts，也没有现成 spec 文件或测试运行器配置。开始依赖自动化测试前，先补齐测试运行器、脚本和最小测试配置，再为 Service 编写单元测试、为 HTTP 流程编写端到端测试。
-
-构建通过后，部署时注入目标环境的数据库配置和 JWT 密钥，并在应用启动前执行待处理迁移。
-
-## CLI 速查
-
-Nest CLI：
-
-```bash
-pnpm exec nest g module <name>
-pnpm exec nest g service <name> --no-spec
-pnpm exec nest g controller <name> --no-spec
-pnpm run build
-```
-
-MikroORM CLI：
-
-```bash
-pnpm exec mikro-orm debug
-pnpm exec mikro-orm migration:create --name=<migration_name>
-pnpm exec mikro-orm migration:pending
-pnpm run orm:up
-pnpm exec mikro-orm seeder:create <SeederName>
-pnpm run seeder:run
-```
-
-官方文档：
-
-- [Nest CLI](https://docs.nestjs.com/cli/usages)
-- [Nest 请求校验](https://docs.nestjs.com/techniques/validation)
-- [MikroORM 迁移](https://mikro-orm.io/docs/migrations)
-- [MikroORM 数据填充](https://mikro-orm.io/docs/seeding)
+不得默认运行 `migration:fresh`、清库、回滚共享环境数据等破坏性命令。只有用户明确授权且已确认目标数据库可销毁时才可执行。
